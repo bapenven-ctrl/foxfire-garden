@@ -52,9 +52,9 @@ mkdir -p out && MAKEFUN_OUTPUT_DIR=out node main.ts
   director), `blessings.js` (the between-night choices), `world.js` (the simulation),
   `render.js` (all drawing, HUD and screens), `shots.js` (the deterministic screenshot
   scenes), `main.js` (boot, the loop and the screens' flow).
-- `screenshots/` — four real renders of the game (title, the Matriarch fight, a blessing
-  choice, the dawn victory), staged deterministically by `game/src/shots.js` through
-  `?shot=<scene>&seed=<n>`; `shots.json` lists them.
+- `screenshots/` — four real renders of the game (the Matriarch fight as the cover,
+  the title, a blessing choice, the defeat), staged deterministically by
+  `game/src/shots.js` through `?shot=<scene>&seed=<n>`; `shots.json` lists them.
 
 MIT licensed — see `LICENSE`.
 

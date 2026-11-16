@@ -18,6 +18,9 @@ export const SCREEN_VICTORY = 'victory';
 
 const TAU = Math.PI * 2;
 
+/** The fox is painted half again its hitbox size, so the keeper reads at a glance. */
+const FOX_SCALE = 1.5;
+
 function hexRgb(hex) {
   return [
     Number.parseInt(hex.slice(1, 3), 16),
@@ -308,8 +311,29 @@ export function createRenderer(canvas) {
       && Math.floor(state.time * 12) % 2 === 0) return;
     const aim = player.aim;
     const flip = Math.cos(aim) < 0 ? -1 : 1;
+    // The foxfire halo: warm gold over vermillion, so the keeper glows against the
+    // indigo garden and the eye finds her even in a crowded frame.
+    const halo = context.createRadialGradient(player.x, player.y, 4, player.x, player.y, 64);
+    halo.addColorStop(0, 'rgba(255, 179, 71, 0.42)');
+    halo.addColorStop(0.55, 'rgba(229, 83, 75, 0.17)');
+    halo.addColorStop(1, 'rgba(229, 83, 75, 0)');
+    context.fillStyle = halo;
+    context.fillRect(player.x - 64, player.y - 64, 128, 128);
+    // The aim line: a dashed thread of foxfire toward where the bolts will fly.
+    if (state.phase === 'combat') {
+      context.save();
+      context.strokeStyle = 'rgba(255, 217, 119, 0.55)';
+      context.lineWidth = 2;
+      context.setLineDash([7, 7]);
+      context.beginPath();
+      context.moveTo(player.x + Math.cos(aim) * 34, player.y + Math.sin(aim) * 34);
+      context.lineTo(player.x + Math.cos(aim) * 122, player.y + Math.sin(aim) * 122);
+      context.stroke();
+      context.restore();
+    }
     context.save();
     context.translate(player.x, player.y);
+    context.scale(FOX_SCALE, FOX_SCALE);
     // Dash afterimages.
     if (player.dashTimer > 0) {
       context.globalAlpha = 0.3;
@@ -386,7 +410,7 @@ export function createRenderer(canvas) {
       context.strokeStyle = `rgba(255, 217, 119, ${0.55 + 0.3 * Math.sin(state.time * 3)})`;
       context.lineWidth = 2;
       context.beginPath();
-      context.arc(player.x, player.y, PLAYER.radius + 8, 0, TAU);
+      context.arc(player.x, player.y, PLAYER.radius * FOX_SCALE + 8, 0, TAU);
       context.stroke();
     }
     // Dash readiness, a small arc under the fox while it recharges.
@@ -396,7 +420,7 @@ export function createRenderer(canvas) {
       context.strokeStyle = 'rgba(253, 246, 227, 0.35)';
       context.lineWidth = 3;
       context.beginPath();
-      context.arc(player.x, player.y + PLAYER.radius + 9, 9, -Math.PI / 2, -Math.PI / 2 + fraction * TAU);
+      context.arc(player.x, player.y + PLAYER.radius * FOX_SCALE + 10, 9, -Math.PI / 2, -Math.PI / 2 + fraction * TAU);
       context.stroke();
     }
   }
@@ -426,6 +450,15 @@ export function createRenderer(canvas) {
       context.restore();
     }
     context.globalAlpha = 1;
+    // A plain moth wears deep-violet wing spots; only the Matriarch wears gold.
+    if (!crowned) {
+      context.fillStyle = 'rgba(74, 44, 148, 0.55)';
+      for (const side of [-1, 1]) {
+        context.beginPath();
+        context.arc(side * 14 * scale, -3 * scale, 3.6 * scale, 0, TAU);
+        context.fill();
+      }
+    }
     context.fillStyle = bodyColor;
     context.beginPath();
     context.ellipse(0, 0, 6.5 * scale, 10 * scale, 0, 0, TAU);
@@ -489,6 +522,13 @@ export function createRenderer(canvas) {
     context.moveTo(0, -16);
     context.lineTo(0, 14);
     context.stroke();
+    // A gold racing stripe down the shell, so the beetle reads teal-and-gold at once.
+    context.strokeStyle = 'rgba(242, 201, 76, 0.85)';
+    context.lineWidth = 3;
+    context.beginPath();
+    context.moveTo(0, -13);
+    context.lineTo(0, 11);
+    context.stroke();
     // The horn and the eyes face the Bloom (down-field of its march).
     context.fillStyle = '#d8cf9f';
     context.beginPath();
@@ -511,8 +551,8 @@ export function createRenderer(canvas) {
     context.translate(enemy.x, enemy.y);
     const angle = Math.atan2(enemy.vy || 0.01, enemy.vx || 0.01);
     context.rotate(enemy.mode === 'stalk' ? Math.sin(enemy.t * 2 + enemy.seed) * 0.3 : angle * 0.2);
-    context.fillStyle = PALETTE.darterWing;
-    context.globalAlpha = 0.75;
+    context.fillStyle = PALETTE.gold;
+    context.globalAlpha = 0.85;
     for (const side of [-1, 1]) {
       context.beginPath();
       context.ellipse(side * 8, -8 - flap * 3, 10, 4, side * (0.7 + flap * 0.4), 0, TAU);
@@ -521,7 +561,7 @@ export function createRenderer(canvas) {
     context.globalAlpha = 1;
     context.fillStyle = PALETTE.darter;
     context.beginPath();
-    context.ellipse(0, 0, 7, 13, 0, 0, TAU);
+    context.ellipse(0, 0, 7.5, 14.5, 0, 0, TAU);
     context.fill();
     context.fillStyle = '#ffd166';
     context.beginPath();
@@ -551,6 +591,12 @@ export function createRenderer(canvas) {
     context.beginPath();
     context.ellipse(0, 2, 16, 14, 0, 0, TAU);
     context.fill();
+    // A dark moss outline, so the spitter's green holds its shape against the grass.
+    context.strokeStyle = '#2c4a26';
+    context.lineWidth = 2.2;
+    context.beginPath();
+    context.ellipse(0, 2, 16, 14, 0, 0, TAU);
+    context.stroke();
     // The spore sac, swelling before each shot.
     const charge = 1 - Math.max(0, enemy.shootTimer) / 2.6;
     context.fillStyle = PALETTE.spitterSac;
@@ -579,11 +625,13 @@ export function createRenderer(canvas) {
     context.beginPath();
     context.ellipse(enemy.x, enemy.y + enemy.radius * 0.85, enemy.radius * 0.9, enemy.radius * 0.32, 0, 0, TAU);
     context.fill();
-    if (enemy.kind === KIND_MOTH) drawMothLike(enemy, 1, PALETTE.moth, PALETTE.mothWing, false);
+    // Each kind wears its own colours, far enough apart to name across a crowded frame:
+    // the moth deep violet, the Matriarch magenta with her gold crown.
+    if (enemy.kind === KIND_MOTH) drawMothLike(enemy, 1, '#7e63d8', PALETTE.mothWing, false);
     else if (enemy.kind === KIND_BEETLE) drawBeetle(enemy);
     else if (enemy.kind === KIND_DARTER) drawDarter(enemy);
     else if (enemy.kind === KIND_SPITTER) drawSpitter(enemy);
-    else if (enemy.kind === KIND_MATRIARCH) drawMothLike(enemy, 2.9, PALETTE.matriarch, '#d9c8f5', true);
+    else if (enemy.kind === KIND_MATRIARCH) drawMothLike(enemy, 2.9, '#cf6fe0', '#ecd9ff', true);
     if (enemy.flash > 0) {
       context.globalAlpha = Math.min(1, enemy.flash * 9);
       context.fillStyle = '#ffffff';
@@ -624,9 +672,15 @@ export function createRenderer(canvas) {
       context.fill();
     }
     for (const bullet of state.bullets) {
-      context.fillStyle = 'rgba(255, 179, 71, 0.32)';
+      // A vermillion halo around the gold core: a stream of foxfire reads as fire,
+      // not lamplight, against the lavender gloom.
+      context.fillStyle = 'rgba(229, 83, 75, 0.38)';
       context.beginPath();
-      context.arc(bullet.x, bullet.y, 10, 0, TAU);
+      context.arc(bullet.x, bullet.y, 12, 0, TAU);
+      context.fill();
+      context.fillStyle = 'rgba(255, 179, 71, 0.35)';
+      context.beginPath();
+      context.arc(bullet.x, bullet.y, 8, 0, TAU);
       context.fill();
       context.fillStyle = PALETTE.goldSoft;
       context.beginPath();
@@ -850,7 +904,7 @@ export function createRenderer(canvas) {
     text(bestLine, FIELD.width / 2, 540, 19, PALETTE.goldSoft, 'center', BODY_FONT, 'bold');
     const pulse = 0.8 + 0.2 * Math.sin(state.time * 2.6);
     context.globalAlpha = pulse;
-    text('PRESS ENTER OR CLICK TO PLAY AGAIN', FIELD.width / 2, 586, 21, PALETTE.goldSoft, 'center', BODY_FONT, 'bold');
+    text('PRESS ENTER OR CLICK TO TRY AGAIN', FIELD.width / 2, 586, 21, PALETTE.goldSoft, 'center', BODY_FONT, 'bold');
     context.globalAlpha = 1;
   }
 

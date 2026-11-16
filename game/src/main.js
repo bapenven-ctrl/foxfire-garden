@@ -4,9 +4,9 @@
 // and victory — and this file owns the moves between them, the sounds each event earns,
 // and the best score's keeping.
 //
-// ?seed=N fixes the garden's randomness. ?shot=title|battle|blessing|victory (with
-// &seed=N) stages that scene instead of running the loop, paints it twice and sets
-// window.__shotReady for a screenshot.
+// ?seed=N fixes the garden's randomness. ?shot=title|battle|blessing|defeat|victory
+// (with &seed=N) stages that scene instead of running the loop, paints it twice and
+// sets window.__shotReady for a screenshot.
 
 import { BEST_KEY, STEP } from './config.js';
 import { createRandom } from './random.js';

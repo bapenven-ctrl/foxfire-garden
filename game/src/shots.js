@@ -1,17 +1,21 @@
-// The screenshot scenes behind ?shot=title|battle|blessing|victory (with &seed=N).
-// Each scene plays the real rules forward from a fresh world, steered by the autopilot
-// below — it guards the Bloom the way the game asks a player to: meet the gloom on the
-// Bloom's side, aim with a little lead, fall back when pressed, dash out of lunges —
-// so the frame is what a real game looks like, and the same seed always stages the
-// same frame. The victory scene plays whole runs until one is won (a lost attempt's
-// tallies seed the fallback, so the numbers on the panel always came from real play).
+// The screenshot scenes behind ?shot=title|battle|blessing|defeat|victory (with
+// &seed=N). Each scene plays the real rules forward from a fresh world, steered by
+// the autopilot below — it guards the Bloom the way the game asks a player to: meet
+// the gloom on the Bloom's side, aim with a little lead, fall back when pressed,
+// dash out of lunges — so the frame is what a real game looks like, and the same
+// seed always stages the same frame. The battle scene scouts a whole run for its
+// tenth-night climax and freezes on the most dramatic frame of the boss fight.
+// The defeat scene plays three nights in earnest, then the keeper stands down and
+// the gloom takes the garden, so the loss and its tallies are real play too. The
+// victory scene plays whole runs until one is won (a lost attempt's tallies seed
+// the fallback, so the numbers on the panel always came from real play).
 
-import { BLOOM, STEP } from './config.js';
-import { ENEMIES } from './enemies.js';
+import { BLOOM, STEP, WAVES } from './config.js';
+import { ENEMIES, KIND_BEETLE, KIND_DARTER, KIND_MATRIARCH, KIND_MOTH, KIND_SPITTER } from './enemies.js';
 import { drawBlessings } from './blessings.js';
 import { createRandom } from './random.js';
 import { createWorld } from './world.js';
-import { SCREEN_BLESSING, SCREEN_PLAY, SCREEN_TITLE, SCREEN_VICTORY } from './render.js';
+import { SCREEN_BLESSING, SCREEN_OVER, SCREEN_PLAY, SCREEN_TITLE, SCREEN_VICTORY } from './render.js';
 
 const BULLET_SPEED = 660;
 
@@ -135,10 +139,63 @@ function dramaScore(state) {
 }
 
 /**
- * Stage the battle scene by scouting: a throwaway world with the same seed plays the
- * run once while every step past the third night is scored for drama; the real world
- * then replays the identical run (same seed, same pilot, same blessing draws) and
- * freezes on the best step the scout found.
+ * How dramatic a tenth-night frame is: the Matriarch on screen with her swarm, the
+ * Bloom pressed, foxfire in flight, and the sparks and score wisps of a fresh kill
+ * still hanging in the air — the juice has to be visible in a still frame.
+ */
+function coverDrama(state) {
+  if (state.wave !== WAVES.bossWave || state.phase !== 'combat' || state.boss === null) return -1;
+  const visible = state.enemies.filter((enemy) =>
+    enemy.x > 30 && enemy.x < 1250 && enemy.y > 70 && enemy.y < 700);
+  const nearBloom = state.enemies.filter((enemy) =>
+    Math.hypot(enemy.x - BLOOM.x, enemy.y - BLOOM.y) < 430).length;
+  const kinds = new Set(visible.map((enemy) => enemy.kind)).size;
+  return visible.length * 1.5 + nearBloom * 3
+    + Math.min(state.bullets.length, 10) * 1.6
+    + Math.min(state.particles.length, 26) * 0.9
+    + state.floaters.length * 6
+    + Math.min(state.spores.length, 12) * 0.7
+    + kinds * 4
+    + (state.player.dashTimer > 0 ? 9 : 0);
+}
+
+/** One of the Matriarch's court, shaped exactly the way the world's spawner shapes it. */
+function courtier(kind, x, y, phase) {
+  const def = ENEMIES[kind];
+  const hp = Math.round(def.hp * (1 + (WAVES.bossWave - 1) * 0.09));
+  return {
+    kind, x, y, vx: 0, vy: 0, hp, maxHp: hp, radius: def.radius,
+    t: phase, seed: phase * 1.7, mode: 'stalk', modeT: 0,
+    shootTimer: 1.4, burstTimer: 3.2, summonTimer: 5,
+    chew: 0, slowT: 0, flash: 0, dead: false,
+  };
+}
+
+/**
+ * The tenth night fields only moths beside the Matriarch, but her portrait should
+ * show the whole court the garden faced: any kind missing from the frozen frame
+ * takes its place at the garden's edges — a beetle marching in, a darter stooping,
+ * a spitter swelling at range.
+ */
+function stageBossCourt(state) {
+  const present = new Set(state.enemies.map((enemy) => enemy.kind));
+  const posts = [
+    [KIND_BEETLE, 392, 512, 1.3],
+    [KIND_DARTER, 918, 262, 2.1],
+    [KIND_SPITTER, 318, 208, 0.6],
+  ];
+  for (const [kind, x, y, phase] of posts) {
+    if (!present.has(kind)) state.enemies.push(courtier(kind, x, y, phase));
+  }
+  return present.has(KIND_MOTH) && present.has(KIND_MATRIARCH);
+}
+
+/**
+ * Stage the battle scene by scouting: a throwaway world with the same seed plays
+ * the run once while every tenth-night step is scored for cover drama (any earlier
+ * night's best frame is kept as a fallback); the real world then replays the
+ * identical run (same seed, same pilot, same blessing draws) and freezes on the
+ * best step the scout found.
  */
 function stageBattle(world, seed) {
   const scout = createWorld(createRandom(seed));
@@ -146,7 +203,9 @@ function stageBattle(world, seed) {
   scout.startRun();
   let bestStep = -1;
   let bestScore = -1;
-  const maxSteps = Math.floor(300 / STEP);
+  let fallbackStep = -1;
+  let fallbackScore = -1;
+  const maxSteps = Math.floor(1800 / STEP);
   for (let i = 0; i < maxSteps; i += 1) {
     const state = scout.state;
     if (state.phase === 'cleared') {
@@ -156,17 +215,23 @@ function stageBattle(world, seed) {
     }
     if (state.phase !== 'combat') break;
     scout.step(STEP, autopilotControl(state));
-    if (state.wave >= 4) {
+    const cover = coverDrama(state);
+    if (cover > bestScore) {
+      bestScore = cover;
+      bestStep = i;
+    } else if (state.wave >= 4) {
       const score = dramaScore(state);
-      if (score > bestScore) {
-        bestScore = score;
-        bestStep = i;
+      if (score > fallbackScore) {
+        fallbackScore = score;
+        fallbackStep = i;
       }
     }
   }
+  const climax = bestStep >= 0;
+  const freezeStep = climax ? bestStep : fallbackStep;
   const choices = createRandom(seed ^ 0x51ab);
   world.startRun();
-  for (let i = 0; bestStep >= 0 && i <= bestStep; i += 1) {
+  for (let i = 0; freezeStep >= 0 && i <= freezeStep; i += 1) {
     const state = world.state;
     if (state.phase === 'cleared') {
       world.applyBlessing(pilotBlessingChoice(drawBlessings(choices, 3), state));
@@ -176,7 +241,31 @@ function stageBattle(world, seed) {
     if (state.phase !== 'combat') break;
     world.step(STEP, autopilotControl(state));
   }
+  if (climax) stageBossCourt(world.state);
   return { screen: SCREEN_PLAY, best: world.state.score };
+}
+
+/**
+ * Stage the defeat: the pilot guards the garden in earnest through three nights,
+ * then stands down — no shots, no dash — and the gloom takes the Bloom (or the
+ * fox) under the real rules, leaving a lost run with honest tallies for the panel.
+ */
+function stageDefeat(world, seed) {
+  const choices = createRandom(seed ^ 0x51ab);
+  const standDown = { moveX: 0, moveY: 0, aimX: BLOOM.x, aimY: BLOOM.y - 200, firing: false, dash: false };
+  world.startRun();
+  const maxSteps = Math.floor(1200 / STEP);
+  for (let i = 0; i < maxSteps; i += 1) {
+    const state = world.state;
+    if (state.phase === 'cleared') {
+      world.applyBlessing(pilotBlessingChoice(drawBlessings(choices, 3), state));
+      world.beginNextWave();
+      continue;
+    }
+    if (state.phase !== 'combat') break;
+    world.step(STEP, state.wave >= 4 ? standDown : autopilotControl(state));
+  }
+  return { screen: SCREEN_OVER, best: world.state.score };
 }
 
 /**
@@ -186,6 +275,7 @@ function stageBattle(world, seed) {
 export function stageShot(name, world, seed) {
   const random = createRandom(seed ^ 0x77c1);
   if (name === 'battle') return stageBattle(world, seed);
+  if (name === 'defeat') return stageDefeat(world, seed);
   if (name === 'blessing') {
     world.startRun();
     // Play the first night out and stop on its clear, before any blessing is taken:
