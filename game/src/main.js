@@ -15,7 +15,9 @@ import { createInput, ACTION_CONFIRM, ACTION_DASH, ACTION_MUTE, ACTION_PAUSE, AC
 import { createAudio } from './audio.js';
 import { blessingById, drawBlessings } from './blessings.js';
 import { blessingCardRect, createRenderer, SCREEN_BLESSING, SCREEN_OVER, SCREEN_PAUSED, SCREEN_PLAY, SCREEN_TITLE, SCREEN_VICTORY } from './render.js';
-import { stageShot } from './shots.js';
+import { createShotScenes } from './shots.js';
+
+const { stageShot } = createShotScenes();
 
 /** The longest frame the loop catches up on; a longer stall (a hidden tab) is dropped. */
 const MAX_FRAME = 0.25;

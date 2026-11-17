@@ -5,6 +5,12 @@
 // enough for the Matriarch. apply() mutates the world's stats block (and, for the two
 // heart blessings, the fox or the Bloom at once).
 
+/** The twelve blessings by name, in pool order — the garden's whole build, at a glance. */
+export const BLESSING_NAMES = [
+  'Ember Bolts', 'Rapid Fire', 'Twin Fire', 'Piercing Light', 'Swift Wings', 'Vital Nectar',
+  'Bloomheart', 'Long Dash', 'Pollen Magnet', 'Frost Petals', 'Spirit Ward', 'Golden Pollen',
+];
+
 export const BLESSINGS = [
   {
     id: 'ember',

@@ -16,6 +16,11 @@ const PROGRESSION = [
 ];
 /** A minor pentatonic ladder for the plucked sparks, in Hz. */
 const SPARKS = [440.0, 523.25, 587.33, 659.25, 783.99, 880.0];
+/** Every synthesised effect the game plays, by the name the audio factory returns it under. */
+export const SOUND_EFFECTS = [
+  'shoot', 'hitEnemy', 'killEnemy', 'bossDown', 'pickup', 'heartPickup', 'playerHurt',
+  'bloomHurt', 'dash', 'waveStart', 'waveClear', 'blessing', 'victory', 'gameOver',
+];
 
 export function createAudio(random) {
   let context = null;
